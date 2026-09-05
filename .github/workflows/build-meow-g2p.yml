@@ -1,0 +1,85 @@
+name: Build meow-g2p release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version without v prefix
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.edition }} / ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        edition: [en, zh]
+        target:
+          - runner: macos-14
+            platform: darwin-arm64
+          - runner: macos-15-intel
+            platform: darwin-x64
+          - runner: ubuntu-24.04-arm
+            platform: linux-arm64
+          - runner: ubuntu-24.04
+            platform: linux-x64
+          - runner: windows-2022
+            platform: win32-x64
+    runs-on: ${{ matrix.target.runner }}
+    steps:
+      - name: Restore private build source
+        shell: bash
+        env:
+          SOURCE_B64: ${{ secrets.MEOW_G2P_SOURCE_B64 }}
+        run: |
+          python - <<'PY'
+          import base64, os, pathlib, tarfile
+          archive = pathlib.Path("source.tar.gz")
+          archive.write_bytes(base64.b64decode(os.environ["SOURCE_B64"]))
+          with tarfile.open(archive, "r:gz") as bundle:
+              bundle.extractall("source", filter="data")
+          PY
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: source/requirements-${{ matrix.edition }}.txt
+      - name: Install frozen application dependencies
+        shell: bash
+        run: python -m pip install -r source/requirements-${{ matrix.edition }}.txt
+      - name: Build and smoke test
+        shell: bash
+        run: >-
+          python source/build_release.py
+          --edition ${{ matrix.edition }}
+          --platform ${{ matrix.target.platform }}
+          --version ${{ inputs.version }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: meow-g2p-${{ matrix.edition }}-${{ matrix.target.platform }}
+          path: source/output/*
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: meow-g2p-*
+          path: release
+          merge-multiple: true
+      - name: Publish immutable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: meow-g2p-v${{ inputs.version }}
+        run: |
+          gh release create "$TAG" release/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "meow-g2p v${{ inputs.version }}" \
+            --notes "Self-contained English and Chinese Kokoro G2P workers. Each archive embeds its Python runtime and language dependencies; no system Python installation is required."
