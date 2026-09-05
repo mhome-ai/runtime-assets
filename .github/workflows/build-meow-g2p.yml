@@ -13,6 +13,12 @@ on:
         default: all
         type: choice
         options: [all, darwin-arm64, darwin-x64, linux-arm64, linux-x64, win32-x64]
+      edition:
+        description: Build one language edition or all
+        required: true
+        default: all
+        type: choice
+        options: [all, en, zh]
       publish:
         description: Publish the complete matrix as a release
         required: true
@@ -41,7 +47,9 @@ jobs:
           - runner: windows-2022
             platform: win32-x64
     runs-on: ${{ matrix.target.runner }}
-    if: ${{ inputs.platform == 'all' || inputs.platform == matrix.target.platform }}
+    if: >-
+      ${{ (inputs.platform == 'all' || inputs.platform == matrix.target.platform) &&
+          (inputs.edition == 'all' || inputs.edition == matrix.edition) }}
     steps:
       - name: Restore private build source
         shell: bash
@@ -79,7 +87,7 @@ jobs:
 
   release:
     needs: build
-    if: ${{ inputs.publish && inputs.platform == 'all' }}
+    if: ${{ inputs.publish && inputs.platform == 'all' && inputs.edition == 'all' }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v5
