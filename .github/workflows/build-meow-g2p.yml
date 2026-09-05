@@ -7,6 +7,17 @@ on:
         description: Version without v prefix
         required: true
         type: string
+      platform:
+        description: Build one platform or all
+        required: true
+        default: all
+        type: choice
+        options: [all, darwin-arm64, darwin-x64, linux-arm64, linux-x64, win32-x64]
+      publish:
+        description: Publish the complete matrix as a release
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: write
@@ -30,6 +41,7 @@ jobs:
           - runner: windows-2022
             platform: win32-x64
     runs-on: ${{ matrix.target.runner }}
+    if: ${{ inputs.platform == 'all' || inputs.platform == matrix.target.platform }}
     steps:
       - name: Restore private build source
         shell: bash
@@ -67,6 +79,7 @@ jobs:
 
   release:
     needs: build
+    if: ${{ inputs.publish && inputs.platform == 'all' }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v5
@@ -82,4 +95,4 @@ jobs:
           gh release create "$TAG" release/* \
             --repo "$GITHUB_REPOSITORY" \
             --title "meow-g2p v${{ inputs.version }}" \
-            --notes "Self-contained English and Chinese Kokoro G2P workers. Each archive embeds its Python runtime and language dependencies; no system Python installation is required."
+            --notes "Self-contained English and Chinese Kokoro G2P workers. Each asset embeds its Python runtime and language dependencies; no system Python installation is required."
