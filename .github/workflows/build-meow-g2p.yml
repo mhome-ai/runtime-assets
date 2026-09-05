@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build:
-    name: ${{ matrix.edition }} / ${{ matrix.platform }}
+    name: ${{ matrix.edition }} / ${{ matrix.target.platform }}
     strategy:
       fail-fast: false
       matrix:
