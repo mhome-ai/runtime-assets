@@ -6,7 +6,7 @@ G2P releases are built and tested from the private source repository. This repos
 
 Kokoro acoustic models and voice packs are published as separate, independently
 downloadable English and Chinese releases. Each release mirrors bytes pinned by
-SHA-256 from the upstream ONNX exporter and includes an Apache-2.0/MIT license
-bundle, source receipt, notices, and checksums. The private release repository
+SHA-256 from the upstream ONNX exporter and includes Apache-2.0 model terms,
+MIT exporter attribution, a source receipt, notices, and checksums. The private release repository
 contains the validation workflow and manifest; this public repository is only
 the immutable distribution endpoint.
