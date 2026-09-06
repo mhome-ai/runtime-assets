@@ -1,0 +1,17 @@
+name: Validate asset manifests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  model-packs:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: scripts/verify-model-packs.sh
+      - run: bash -n scripts/prepare-model-pack.sh scripts/verify-model-packs.sh

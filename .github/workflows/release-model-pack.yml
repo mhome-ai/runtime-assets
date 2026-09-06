@@ -1,0 +1,69 @@
+name: Release Kokoro model pack
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_id:
+        description: Immutable model pack to publish
+        required: true
+        type: choice
+        options:
+          - kokoro:v1.0-en
+          - kokoro:v1.1-zh
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Validate manifest and select release
+        id: metadata
+        shell: bash
+        env:
+          MODEL_ID: ${{ inputs.model_id }}
+        run: |
+          set -euo pipefail
+          scripts/verify-model-packs.sh
+          echo "public_tag=$(jq -r --arg id "$MODEL_ID" '.packs[] | select(.id == $id) | .publicTag' model-packs.lock.json)" >> "$GITHUB_OUTPUT"
+          echo "display_name=$(jq -r --arg id "$MODEL_ID" '.packs[] | select(.id == $id) | .displayName' model-packs.lock.json)" >> "$GITHUB_OUTPUT"
+      - name: Download, verify, and assemble release
+        shell: bash
+        env:
+          MODEL_ID: ${{ inputs.model_id }}
+        run: scripts/prepare-model-pack.sh "$MODEL_ID" dist
+      - name: Preserve verified pack for recovery
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: model-pack-${{ steps.metadata.outputs.public_tag }}
+          path: dist/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 3
+      - name: Enforce immutable release tags
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLIC_TAG: ${{ steps.metadata.outputs.public_tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "$PUBLIC_TAG" >/dev/null 2>&1; then
+            echo "release already exists and will not be overwritten: $PUBLIC_TAG" >&2
+            exit 1
+          fi
+      - name: Publish immutable public model pack
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          tag_name: ${{ steps.metadata.outputs.public_tag }}
+          target_commitish: main
+          name: ${{ steps.metadata.outputs.display_name }}
+          body: |
+            Optional Kokoro ONNX model pack used by MeowCore.
+
+            The acoustic model and voices are mirrored byte-for-byte from the pinned upstream release. Apache-2.0 model terms, MIT exporter attribution, a source receipt, and SHA-256 checksums are included.
+          files: dist/*
+          fail_on_unmatched_files: true
+          generate_release_notes: false
+          make_latest: false

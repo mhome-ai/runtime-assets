@@ -8,5 +8,6 @@ Kokoro acoustic models and voice packs are published as separate, independently
 downloadable English and Chinese releases. Each release mirrors bytes pinned by
 SHA-256 from the upstream ONNX exporter and includes Apache-2.0 model terms,
 MIT exporter attribution, a source receipt, notices, and checksums. The private release repository
-contains the validation workflow and manifest; this public repository is only
-the immutable distribution endpoint.
+contains native G2P source and build logic. Model mirroring is intentionally
+performed here with this repository's short-lived Actions token, so it needs no
+cross-repository personal access token.
