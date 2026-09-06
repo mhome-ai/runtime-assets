@@ -13,6 +13,9 @@
       "exporterRevision": "b85309f90fd2660ea3309cf0f2581360e4327555",
       "exporterLicense": "MIT",
       "modifications": "None; mirrored byte-for-byte from the exporter release.",
+      "smokeVocab": "vocab/kokoro-v1.0.json",
+      "smokeVoice": "af_heart",
+      "smokePhonemes": "həlˈoʊ wˈɜɹld",
       "artifacts": [
         {
           "id": "model",
@@ -41,6 +44,9 @@
       "exporterRevision": "b85309f90fd2660ea3309cf0f2581360e4327555",
       "exporterLicense": "MIT",
       "modifications": "None; mirrored byte-for-byte from the exporter release.",
+      "smokeVocab": "vocab/kokoro-v1.1-zh.json",
+      "smokeVoice": "zf_001",
+      "smokePhonemes": "ㄋㄧ2ㄏㄠ3/ㄕ十4ㄐㄝ4",
       "artifacts": [
         {
           "id": "model",

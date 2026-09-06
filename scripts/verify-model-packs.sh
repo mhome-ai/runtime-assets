@@ -17,6 +17,9 @@ jq -e '
     (.exporterRevision | test("^[0-9a-f]{40}$")) and
     .modelLicense == "Apache-2.0" and
     .exporterLicense == "MIT" and
+    (.smokeVocab | test("^vocab/[A-Za-z0-9._-]+\\.json$")) and
+    (.smokeVoice | length > 0) and
+    (.smokePhonemes | length > 0) and
     (.artifacts | length == 2) and
     ([.artifacts[].id] | unique | length) == (.artifacts | length) and
     all(.artifacts[];
@@ -31,3 +34,7 @@ jq -e '
 test -f "$root/LICENSES/Kokoro-Apache-2.0.txt"
 test -f "$root/LICENSES/kokoro-onnx-MIT.txt"
 test -f "$root/MODEL_THIRD_PARTY_NOTICES.md"
+
+while IFS= read -r vocab; do
+  test -f "$root/$vocab"
+done < <(jq -r '.packs[].smokeVocab' "$lock")
