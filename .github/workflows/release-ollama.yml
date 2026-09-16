@@ -21,13 +21,7 @@ jobs:
       - name: Install zstd
         run: sudo apt-get update && sudo apt-get install -y zstd
       - name: Validate lock and packer
-        shell: bash
-        run: |
-          set -euo pipefail
-          scripts/ollama/verify-runtimes.sh
-          bash -n scripts/ollama/pack-runtimes.sh scripts/ollama/bump-runtimes.sh scripts/ollama/verify-runtimes.sh scripts/ollama/pack-runtimes.test.sh
-          python3 -m py_compile scripts/ollama/pack_runtimes.py
-          scripts/ollama/pack-runtimes.test.sh
+        run: npm run ollama:test
       - name: Read release identity
         id: metadata
         shell: bash
@@ -38,7 +32,7 @@ jobs:
           echo "engine_version=$(jq -r '.engineVersion' ollama/runtimes.lock.json)" >> "$GITHUB_OUTPUT"
       - name: Pack Linux CPU and CUDA runtimes
         shell: bash
-        run: scripts/ollama/pack-runtimes.sh dist
+        run: npm run ollama:pack -- dist
       - name: Preserve packed runtimes for recovery
         if: inputs.publish
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

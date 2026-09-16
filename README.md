@@ -15,10 +15,10 @@ cross-repository personal access token.
 ## Ollama Linux runtimes
 
 Linux Ollama CPU and CUDA archives are packed here from the official GitHub
-release pinned in `ollama/runtimes.lock.json`. Scripts live in `scripts/ollama/`;
-the published tarballs, MIT license, notices, and SHA-256 list go on the
-immutable GitHub Release `ollama-v<engineVersion>`. Git does not store the
-multi-gigabyte archives.
+release pinned in `ollama/runtimes.lock.json`. Pack, bump, and verify run as
+npm scripts (`ollama:pack`, `ollama:bump`, `ollama:test`) in Node. The published
+tarballs, MIT license, notices, and SHA-256 list go on the immutable GitHub
+Release `ollama-v<engineVersion>`. Git does not store the multi-gigabyte archives.
 
 CPU packs drop `lib/ollama/cuda_v12` and `cuda_v13`. CUDA packs are the official
 archives, renamed, and keep both CUDA 12 and 13 so Ollama can choose at runtime.
@@ -33,7 +33,7 @@ Point the lock at a new official version (checksums come from the official
 GitHub `sha256sum.txt`):
 
 ```bash
-scripts/ollama/bump-runtimes.sh 0.33.0
+npm run ollama:bump -- 0.33.0
 ```
 
 Official archives are downloaded by the packer into `ollama/upstream/` (gitignored).
@@ -42,15 +42,14 @@ If a file is already there and matches the pinned SHA-256, it is reused.
 Validate without downloading the multi-gigabyte archives:
 
 ```bash
-scripts/ollama/verify-runtimes.sh
-scripts/ollama/pack-runtimes.test.sh
+npm run ollama:test
 ```
 
 Optional local pack after bump. CI is what publishes; this is a smoke check.
 Cached official tarballs stay in `ollama/upstream/`.
 
 ```bash
-scripts/ollama/pack-runtimes.sh dist
+npm run ollama:pack -- dist
 ```
 
 Commit the lock, merge to `main`, then run workflow `Release Ollama Linux

@@ -22,7 +22,4 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: sudo apt-get update && sudo apt-get install -y zstd
-      - run: scripts/ollama/verify-runtimes.sh
-      - run: bash -n scripts/ollama/pack-runtimes.sh scripts/ollama/bump-runtimes.sh scripts/ollama/verify-runtimes.sh scripts/ollama/pack-runtimes.test.sh
-      - run: python3 -m py_compile scripts/ollama/pack_runtimes.py
-      - run: scripts/ollama/pack-runtimes.test.sh
+      - run: npm run ollama:test
