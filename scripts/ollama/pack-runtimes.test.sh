@@ -107,5 +107,29 @@ assert any("cuda_v12" in name for name in cuda_names)
 assert any("cuda_v13" in name for name in cuda_names)
 assert (output / "LICENSE").is_file()
 assert (output / "SHA256SUMS").is_file()
-print("ok")
+print("ok pack")
+
+arm = source_dir / "ollama-linux-arm64.tar.zst"
+arm.write_bytes(archive.read_bytes())
+lock["sources"]["linux-arm64"] = {
+    "url": "https://github.com/ollama/ollama/releases/download/v0.0.0/ollama-linux-arm64.tar.zst",
+    "fileName": "ollama-linux-arm64.tar.zst",
+    "sha256": digest,
+    "sizeBytes": size,
+}
+(fixture_root / "ollama/runtimes.lock.json").write_text(json.dumps(lock, indent=2) + "\n")
+pack_runtimes.bump_runtimes(
+    fixture_root,
+    "1.2.3",
+    source_dir,
+    fixture_root / "LICENSES/ollama-MIT.txt",
+)
+bumped = json.loads((fixture_root / "ollama/runtimes.lock.json").read_text())
+assert bumped["engineVersion"] == "1.2.3"
+assert bumped["publicTag"] == "ollama-v1.2.3"
+assert bumped["upstreamTag"] == "v1.2.3"
+assert bumped["sources"]["linux-amd64"]["url"].endswith("/v1.2.3/ollama-linux-amd64.tar.zst")
+assert bumped["sources"]["linux-amd64"]["sha256"] == digest
+assert bumped["packs"][0]["exclude"] == ["lib/ollama/cuda_v12", "lib/ollama/cuda_v13"]
+print("ok bump")
 PY

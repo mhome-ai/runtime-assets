@@ -25,19 +25,32 @@ archives, renamed, and keep both CUDA 12 and 13 so Ollama can choose at runtime.
 ROCm and MLX extras are not published. ARM CUDA is the SBSA/server build, not
 Jetson. Darwin continues to use the official `ollama-darwin.tgz` from Ollama.
 
-Validate without downloading upstream:
+The lockfile is the version pin. Official Ollama `v0.32.14` becomes our
+Release `ollama-v0.32.14`. A new upstream version needs a new lock commit and a
+new Release; tags are never overwritten.
+
+Point the lock at a new official version (hashes come from GitHub, or from files
+already in `OLLAMA_SOURCE_DIR`):
+
+```bash
+scripts/ollama/bump-runtimes.sh 0.33.0
+```
+
+Validate without downloading the multi-gigabyte archives:
 
 ```bash
 scripts/ollama/verify-runtimes.sh
 scripts/ollama/pack-runtimes.test.sh
 ```
 
-Pack from the pinned official archives (optional local cache of those files):
+Optional local pack after bump, using official tarballs you already downloaded.
+CI is what publishes; this is only for a smoke check.
 
 ```bash
 OLLAMA_SOURCE_DIR=/path/to/official-tars scripts/ollama/pack-runtimes.sh dist
 ```
 
-Publish with workflow `Release Ollama Linux runtimes`. Existing release tags are
-never overwritten. After a release, copy the published SHA-256 values into the
-desktop runtime catalog.
+Commit the lock, merge to `main`, then run workflow `Release Ollama Linux
+runtimes`. That job reads the lock, downloads those exact official archives,
+packs CPU/CUDA, and uploads GitHub Release `ollama-v<engineVersion>`. After it
+finishes, copy `SHA256SUMS` into the desktop runtime catalog.

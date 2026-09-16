@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: Publish after packing (disable to assemble only)
+        description: Publish the engineVersion pinned in ollama/runtimes.lock.json. Bump that lock first.
         required: true
         default: true
         type: boolean
@@ -25,7 +25,7 @@ jobs:
         run: |
           set -euo pipefail
           scripts/ollama/verify-runtimes.sh
-          bash -n scripts/ollama/pack-runtimes.sh scripts/ollama/verify-runtimes.sh scripts/ollama/pack-runtimes.test.sh
+          bash -n scripts/ollama/pack-runtimes.sh scripts/ollama/bump-runtimes.sh scripts/ollama/verify-runtimes.sh scripts/ollama/pack-runtimes.test.sh
           python3 -m py_compile scripts/ollama/pack_runtimes.py
           scripts/ollama/pack-runtimes.test.sh
       - name: Read release identity

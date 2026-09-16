@@ -7,12 +7,19 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tarfile
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Set
+
+VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
+SOURCE_FILES = {
+    "linux-amd64": "ollama-linux-amd64.tar.zst",
+    "linux-arm64": "ollama-linux-arm64.tar.zst",
+}
 
 
 SKIP_NAMES = {".DS_Store"}
@@ -228,6 +235,109 @@ def selected_packs(lock: dict, pack_id: Optional[str]) -> List[dict]:
     return matches
 
 
+def parse_sha256sum(text: str) -> Dict[str, str]:
+    mapping: Dict[str, str] = {}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) < 2:
+            raise SystemExit(f"invalid sha256sum line: {line}")
+        mapping[parts[-1].lstrip("*")] = parts[0].lower()
+    return mapping
+
+
+def curl_bytes(url: str) -> bytes:
+    return subprocess.check_output(
+        [
+            "curl",
+            "--fail",
+            "--location",
+            "--retry",
+            "5",
+            "--retry-delay",
+            "2",
+            "--connect-timeout",
+            "20",
+            url,
+        ]
+    )
+
+
+def curl_content_length(url: str) -> int:
+    headers = subprocess.check_output(
+        ["curl", "--fail", "--location", "--silent", "--head", url],
+        text=True,
+    )
+    length = None
+    for line in headers.splitlines():
+        key, _, value = line.partition(":")
+        if key.lower() == "content-length" and value.strip().isdigit():
+            length = int(value.strip())
+    if not length:
+        raise SystemExit(f"could not read Content-Length for {url}")
+    return length
+
+
+def official_url(version: str, file_name: str) -> str:
+    return (
+        f"https://github.com/ollama/ollama/releases/download/v{version}/{file_name}"
+    )
+
+
+def bump_runtimes(
+    root: Path, version: str, source_dir: Optional[Path], license_file: Optional[Path]
+) -> None:
+    if not VERSION_RE.match(version):
+        raise SystemExit(f"version must be X.Y.Z, got {version}")
+    lock = load_lock(root)
+    lock["engineVersion"] = version
+    lock["publicTag"] = f"ollama-v{version}"
+    lock["displayName"] = f"Ollama Linux runtimes {version}"
+    lock["upstreamTag"] = f"v{version}"
+    lock["license"]["url"] = (
+        f"https://raw.githubusercontent.com/ollama/ollama/v{version}/LICENSE"
+    )
+
+    if license_file is not None:
+        license_bytes = license_file.read_bytes()
+    else:
+        license_bytes = curl_bytes(lock["license"]["url"])
+    license_text = license_bytes.decode("utf-8")
+    if not license_text.endswith("\n"):
+        license_text += "\n"
+        license_bytes = license_text.encode("utf-8")
+    (root / "LICENSES" / "ollama-MIT.txt").write_bytes(license_bytes)
+    lock["license"]["sha256"] = hashlib.sha256(license_bytes).hexdigest()
+
+    checksums: Dict[str, str] = {}
+    if source_dir is None:
+        checksums = parse_sha256sum(
+            curl_bytes(official_url(version, "sha256sum.txt")).decode("utf-8")
+        )
+
+    for source_id, file_name in SOURCE_FILES.items():
+        source = lock["sources"][source_id]
+        source["url"] = official_url(version, file_name)
+        source["fileName"] = file_name
+        local = source_dir / file_name if source_dir is not None else None
+        if local is not None:
+            if not local.is_file():
+                raise SystemExit(f"missing local official archive {local}")
+            source["sha256"] = sha256_file(local)
+            source["sizeBytes"] = file_size(local)
+        else:
+            if file_name not in checksums:
+                raise SystemExit(f"{file_name} is not in upstream sha256sum.txt")
+            source["sha256"] = checksums[file_name]
+            source["sizeBytes"] = curl_content_length(source["url"])
+
+    lock_path = root / "ollama" / "runtimes.lock.json"
+    lock_path.write_text(json.dumps(lock, indent=2) + "\n", encoding="utf-8")
+    print(f"pinned Ollama {version} -> {lock_path}", file=sys.stderr)
+
+
 def pack_runtimes(root: Path, output: Path, pack_id: Optional[str]) -> None:
     lock = load_lock(root)
     if output.exists():
@@ -264,6 +374,10 @@ def build_parser() -> argparse.ArgumentParser:
     pack.add_argument("--root", type=Path, required=True)
     pack.add_argument("--output", type=Path, required=True)
     pack.add_argument("--pack", dest="pack_id")
+    bump = sub.add_parser("bump", help="retarget the lockfile to an official Ollama version")
+    bump.add_argument("--root", type=Path, required=True)
+    bump.add_argument("--version", required=True)
+    bump.add_argument("--license-file", type=Path)
     return parser
 
 
@@ -271,6 +385,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "pack":
         pack_runtimes(args.root.resolve(), args.output.resolve(), args.pack_id)
+        return 0
+    if args.command == "bump":
+        cache = (
+            Path(os.environ["OLLAMA_SOURCE_DIR"]).expanduser()
+            if os.environ.get("OLLAMA_SOURCE_DIR")
+            else None
+        )
+        license_file = args.license_file.resolve() if args.license_file else None
+        bump_runtimes(args.root.resolve(), args.version, cache, license_file)
         return 0
     raise SystemExit(f"unknown command {args.command}")
 
