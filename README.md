@@ -29,12 +29,15 @@ The lockfile is the version pin. Official Ollama `v0.32.14` becomes our
 Release `ollama-v0.32.14`. A new upstream version needs a new lock commit and a
 new Release; tags are never overwritten.
 
-Point the lock at a new official version (hashes come from GitHub, or from files
-already in `OLLAMA_SOURCE_DIR`):
+Point the lock at a new official version (checksums come from the official
+GitHub `sha256sum.txt`):
 
 ```bash
 scripts/ollama/bump-runtimes.sh 0.33.0
 ```
+
+Official archives are downloaded by the packer into `ollama/upstream/` (gitignored).
+If a file is already there and matches the pinned SHA-256, it is reused.
 
 Validate without downloading the multi-gigabyte archives:
 
@@ -43,14 +46,14 @@ scripts/ollama/verify-runtimes.sh
 scripts/ollama/pack-runtimes.test.sh
 ```
 
-Optional local pack after bump, using official tarballs you already downloaded.
-CI is what publishes; this is only for a smoke check.
+Optional local pack after bump. CI is what publishes; this is a smoke check.
+Cached official tarballs stay in `ollama/upstream/`.
 
 ```bash
-OLLAMA_SOURCE_DIR=/path/to/official-tars scripts/ollama/pack-runtimes.sh dist
+scripts/ollama/pack-runtimes.sh dist
 ```
 
 Commit the lock, merge to `main`, then run workflow `Release Ollama Linux
-runtimes`. That job reads the lock, downloads those exact official archives,
-packs CPU/CUDA, and uploads GitHub Release `ollama-v<engineVersion>`. After it
+runtimes`. That job reads the lock, fills `ollama/upstream/` as needed, packs
+CPU/CUDA, and uploads GitHub Release `ollama-v<engineVersion>`. After it
 finishes, copy `SHA256SUMS` into the desktop runtime catalog.

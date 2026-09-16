@@ -75,8 +75,15 @@ def assert_layout(archive: Path, require: Sequence[str], forbid: Sequence[str]) 
             )
 
 
+def upstream_dir(root: Path) -> Path:
+    return root / "ollama" / "upstream"
+
+
 def download(url: str, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
+    partial = dest.with_name(dest.name + ".partial")
+    if partial.exists():
+        partial.unlink()
     subprocess.check_call(
         [
             "curl",
@@ -89,31 +96,36 @@ def download(url: str, dest: Path) -> None:
             "--connect-timeout",
             "20",
             "--output",
-            str(dest),
+            str(partial),
             url,
         ]
     )
+    partial.replace(dest)
 
 
-def ensure_source(
-    source: dict, cache_dir: Optional[Path], fetch_dir: Path
-) -> Path:
+def cache_matches(path: Path, sha256: str, size_bytes: int) -> bool:
+    return (
+        path.is_file()
+        and file_size(path) == size_bytes
+        and sha256_file(path) == sha256
+    )
+
+
+def ensure_source(source: dict, cache_dir: Path) -> Path:
     file_name = source["fileName"]
-    dest = fetch_dir / file_name
-    cached = cache_dir / file_name if cache_dir is not None else None
-    if cached is not None and cached.is_file():
-        shutil.copy2(cached, dest)
-    elif not dest.is_file():
-        download(source["url"], dest)
-    actual_sha = sha256_file(dest)
-    actual_size = file_size(dest)
-    if actual_sha != source["sha256"]:
+    dest = cache_dir / file_name
+    if cache_matches(dest, source["sha256"], source["sizeBytes"]):
+        print(f"using cached {file_name}", file=sys.stderr)
+        return dest
+    if dest.exists():
+        print(f"replacing mismatched {file_name}", file=sys.stderr)
+        dest.unlink()
+    print(f"downloading {file_name}", file=sys.stderr)
+    download(source["url"], dest)
+    if not cache_matches(dest, source["sha256"], source["sizeBytes"]):
+        dest.unlink(missing_ok=True)
         raise SystemExit(
-            f"{file_name} sha256 mismatch: {actual_sha} != {source['sha256']}"
-        )
-    if actual_size != source["sizeBytes"]:
-        raise SystemExit(
-            f"{file_name} size mismatch: {actual_size} != {source['sizeBytes']}"
+            f"{file_name} did not match pinned sha256 or size after download"
         )
     return dest
 
@@ -213,7 +225,12 @@ def pack_one(
     dest = output / pack["fileName"]
     transform = pack["transform"]
     if transform == "identity":
-        shutil.copy2(source_path, dest)
+        if dest.exists() or dest.is_symlink():
+            dest.unlink()
+        try:
+            os.link(source_path, dest)
+        except OSError:
+            shutil.copy2(source_path, dest)
     elif transform == "exclude":
         tree = work_dir / pack["id"]
         extract_excluding(source_path, tree, pack.get("exclude") or [])
@@ -287,7 +304,11 @@ def official_url(version: str, file_name: str) -> str:
 
 
 def bump_runtimes(
-    root: Path, version: str, source_dir: Optional[Path], license_file: Optional[Path]
+    root: Path,
+    version: str,
+    license_file: Optional[Path] = None,
+    checksums: Optional[Dict[str, str]] = None,
+    sizes: Optional[Dict[str, int]] = None,
 ) -> None:
     if not VERSION_RE.match(version):
         raise SystemExit(f"version must be X.Y.Z, got {version}")
@@ -311,8 +332,7 @@ def bump_runtimes(
     (root / "LICENSES" / "ollama-MIT.txt").write_bytes(license_bytes)
     lock["license"]["sha256"] = hashlib.sha256(license_bytes).hexdigest()
 
-    checksums: Dict[str, str] = {}
-    if source_dir is None:
+    if checksums is None:
         checksums = parse_sha256sum(
             curl_bytes(official_url(version, "sha256sum.txt")).decode("utf-8")
         )
@@ -321,16 +341,12 @@ def bump_runtimes(
         source = lock["sources"][source_id]
         source["url"] = official_url(version, file_name)
         source["fileName"] = file_name
-        local = source_dir / file_name if source_dir is not None else None
-        if local is not None:
-            if not local.is_file():
-                raise SystemExit(f"missing local official archive {local}")
-            source["sha256"] = sha256_file(local)
-            source["sizeBytes"] = file_size(local)
+        if file_name not in checksums:
+            raise SystemExit(f"{file_name} is not in upstream sha256sum.txt")
+        source["sha256"] = checksums[file_name]
+        if sizes is not None and file_name in sizes:
+            source["sizeBytes"] = sizes[file_name]
         else:
-            if file_name not in checksums:
-                raise SystemExit(f"{file_name} is not in upstream sha256sum.txt")
-            source["sha256"] = checksums[file_name]
             source["sizeBytes"] = curl_content_length(source["url"])
 
     lock_path = root / "ollama" / "runtimes.lock.json"
@@ -344,16 +360,16 @@ def pack_runtimes(root: Path, output: Path, pack_id: Optional[str]) -> None:
         raise SystemExit(f"output path already exists: {output}")
     output.mkdir(parents=True)
     work_dir = output / ".work"
-    fetch_dir = work_dir / "sources"
-    fetch_dir.mkdir(parents=True)
-    cache = Path(os.environ["OLLAMA_SOURCE_DIR"]).expanduser() if os.environ.get("OLLAMA_SOURCE_DIR") else None
+    work_dir.mkdir(parents=True)
+    cache_dir = upstream_dir(root)
+    cache_dir.mkdir(parents=True, exist_ok=True)
 
     packs = selected_packs(lock, pack_id)
     source_ids: Set[str] = {pack["source"] for pack in packs}
     sources: Dict[str, Path] = {}
     for source_id in sorted(source_ids):
         source = lock["sources"][source_id]
-        sources[source_id] = ensure_source(source, cache, fetch_dir)
+        sources[source_id] = ensure_source(source, cache_dir)
 
     for pack in packs:
         print(f"packing {pack['id']}", file=sys.stderr)
@@ -387,13 +403,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         pack_runtimes(args.root.resolve(), args.output.resolve(), args.pack_id)
         return 0
     if args.command == "bump":
-        cache = (
-            Path(os.environ["OLLAMA_SOURCE_DIR"]).expanduser()
-            if os.environ.get("OLLAMA_SOURCE_DIR")
-            else None
-        )
         license_file = args.license_file.resolve() if args.license_file else None
-        bump_runtimes(args.root.resolve(), args.version, cache, license_file)
+        bump_runtimes(args.root.resolve(), args.version, license_file)
         return 0
     raise SystemExit(f"unknown command {args.command}")
 

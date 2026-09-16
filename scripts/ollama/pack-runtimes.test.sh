@@ -87,11 +87,12 @@ lock = {
 
 (fixture_root / "ollama").mkdir(parents=True)
 (fixture_root / "LICENSES").mkdir(parents=True)
+(fixture_root / "ollama/upstream").mkdir(parents=True)
 shutil.copy2(root / "LICENSES/ollama-MIT.txt", fixture_root / "LICENSES/ollama-MIT.txt")
 shutil.copy2(root / "ollama/NOTICES.md", fixture_root / "ollama/NOTICES.md")
 (fixture_root / "ollama/runtimes.lock.json").write_text(json.dumps(lock, indent=2) + "\n")
+shutil.copy2(archive, fixture_root / "ollama/upstream" / archive.name)
 
-os.environ["OLLAMA_SOURCE_DIR"] = str(source_dir)
 pack_runtimes.pack_runtimes(fixture_root, output, None)
 
 cpu = output / "ollama-linux-amd64-cpu.tar.zst"
@@ -109,7 +110,7 @@ assert (output / "LICENSE").is_file()
 assert (output / "SHA256SUMS").is_file()
 print("ok pack")
 
-arm = source_dir / "ollama-linux-arm64.tar.zst"
+arm = fixture_root / "ollama/upstream/ollama-linux-arm64.tar.zst"
 arm.write_bytes(archive.read_bytes())
 lock["sources"]["linux-arm64"] = {
     "url": "https://github.com/ollama/ollama/releases/download/v0.0.0/ollama-linux-arm64.tar.zst",
@@ -121,8 +122,15 @@ lock["sources"]["linux-arm64"] = {
 pack_runtimes.bump_runtimes(
     fixture_root,
     "1.2.3",
-    source_dir,
-    fixture_root / "LICENSES/ollama-MIT.txt",
+    license_file=fixture_root / "LICENSES/ollama-MIT.txt",
+    checksums={
+        "ollama-linux-amd64.tar.zst": digest,
+        "ollama-linux-arm64.tar.zst": digest,
+    },
+    sizes={
+        "ollama-linux-amd64.tar.zst": size,
+        "ollama-linux-arm64.tar.zst": size,
+    },
 )
 bumped = json.loads((fixture_root / "ollama/runtimes.lock.json").read_text())
 assert bumped["engineVersion"] == "1.2.3"
