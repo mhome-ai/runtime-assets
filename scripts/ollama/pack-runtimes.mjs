@@ -12,6 +12,7 @@ const VERSION_RE = /^[0-9]+\.[0-9]+\.[0-9]+$/;
 const SOURCE_FILES = {
   "linux-amd64": "ollama-linux-amd64.tar.zst",
   "linux-arm64": "ollama-linux-arm64.tar.zst",
+  darwin: "ollama-darwin.tgz",
 };
 const SKIP_NAMES = new Set([".DS_Store"]);
 const GNU_MAGIC = Buffer.from("ustar ");
@@ -60,9 +61,22 @@ function run(command, args, options = {}) {
   return result;
 }
 
+function tarListArgs(archive) {
+  if (archive.endsWith(".tgz") || archive.endsWith(".tar.gz")) {
+    return ["-tzf", archive];
+  }
+  if (archive.endsWith(".tar.zst")) {
+    return ["--zstd", "-tf", archive];
+  }
+  fail(`unsupported archive ${archive}`);
+}
+
 export function listMembers(archive) {
-  const result = run("tar", ["--zstd", "-tf", archive], { stdio: ["ignore", "pipe", "pipe"] });
-  return result.stdout.split(/\r?\n/).filter(Boolean);
+  const result = run("tar", tarListArgs(archive), { stdio: ["ignore", "pipe", "pipe"] });
+  return result.stdout
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((name) => name.replace(/^\.\//, ""));
 }
 
 export async function assertLayout(archive, require = [], forbid = []) {
@@ -427,7 +441,7 @@ export async function bumpRuntimes(root, version, options = {}) {
   const lock = await loadLock(root);
   lock.engineVersion = version;
   lock.publicTag = `ollama-v${version}`;
-  lock.displayName = `Ollama Linux runtimes ${version}`;
+  lock.displayName = `Ollama runtimes ${version}`;
   lock.upstreamTag = `v${version}`;
   lock.license.url = `https://raw.githubusercontent.com/ollama/ollama/v${version}/LICENSE`;
 

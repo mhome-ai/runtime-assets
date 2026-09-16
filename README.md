@@ -14,16 +14,17 @@ cross-repository personal access token.
 
 ## Ollama Linux runtimes
 
-Linux Ollama CPU and CUDA archives are packed here from the official GitHub
-release pinned in `ollama/runtimes.lock.json`. Pack, bump, and verify run as
-npm scripts (`ollama:pack`, `ollama:bump`, `ollama:test`) in Node. The published
-tarballs, MIT license, notices, and SHA-256 list go on the immutable GitHub
-Release `ollama-v<engineVersion>`. Git does not store the multi-gigabyte archives.
+Linux Ollama CPU/CUDA archives and the official macOS archive are packed here
+from the GitHub release pinned in `ollama/runtimes.lock.json`. Pack, bump, and
+verify run as npm scripts (`ollama:pack`, `ollama:bump`, `ollama:test`) in Node.
+The published tarballs, MIT license, notices, and SHA-256 list go on the
+immutable GitHub Release `ollama-v<engineVersion>`. Git does not store the
+multi-gigabyte archives.
 
 CPU packs drop `lib/ollama/cuda_v12` and `cuda_v13`. CUDA packs are the official
 archives, renamed, and keep both CUDA 12 and 13 so Ollama can choose at runtime.
-ROCm and MLX extras are not published. ARM CUDA is the SBSA/server build, not
-Jetson. Darwin continues to use the official `ollama-darwin.tgz` from Ollama.
+The macOS pack is the official `ollama-darwin.tgz`, mirrored unchanged. ROCm
+extras are not published. ARM CUDA is the SBSA/server build, not Jetson.
 
 The lockfile is the version pin. Official Ollama `v0.32.14` becomes our
 Release `ollama-v0.32.14`. A new upstream version needs a new lock commit and a
@@ -54,5 +55,5 @@ npm run ollama:pack -- dist
 
 Commit the lock, merge to `main`, then run workflow `Release Ollama Linux
 runtimes`. That job reads the lock, fills `ollama/upstream/` as needed, packs
-CPU/CUDA, and uploads GitHub Release `ollama-v<engineVersion>`. After it
+CPU/CUDA/darwin, and uploads GitHub Release `ollama-v<engineVersion>`. After it
 finishes, copy `SHA256SUMS` into the desktop runtime catalog.

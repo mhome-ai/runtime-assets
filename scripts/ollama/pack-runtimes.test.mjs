@@ -116,9 +116,16 @@ try {
   console.log("ok pack");
 
   await fs.writeFile(path.join(fixtureRoot, "ollama/upstream/ollama-linux-arm64.tar.zst"), await fs.readFile(archive));
+  await fs.writeFile(path.join(fixtureRoot, "ollama/upstream/ollama-darwin.tgz"), await fs.readFile(archive));
   lock.sources["linux-arm64"] = {
     url: "https://github.com/ollama/ollama/releases/download/v0.0.0/ollama-linux-arm64.tar.zst",
     fileName: "ollama-linux-arm64.tar.zst",
+    sha256: digest,
+    sizeBytes: size,
+  };
+  lock.sources.darwin = {
+    url: "https://github.com/ollama/ollama/releases/download/v0.0.0/ollama-darwin.tgz",
+    fileName: "ollama-darwin.tgz",
     sha256: digest,
     sizeBytes: size,
   };
@@ -131,10 +138,12 @@ try {
     checksums: {
       "ollama-linux-amd64.tar.zst": digest,
       "ollama-linux-arm64.tar.zst": digest,
+      "ollama-darwin.tgz": digest,
     },
     sizes: {
       "ollama-linux-amd64.tar.zst": size,
       "ollama-linux-arm64.tar.zst": size,
+      "ollama-darwin.tgz": size,
     },
   });
   const bumped = await loadLock(fixtureRoot);
@@ -142,6 +151,7 @@ try {
   assert.equal(bumped.publicTag, "ollama-v1.2.3");
   assert.equal(bumped.upstreamTag, "v1.2.3");
   assert.ok(bumped.sources["linux-amd64"].url.endsWith("/v1.2.3/ollama-linux-amd64.tar.zst"));
+  assert.ok(bumped.sources.darwin.url.endsWith("/v1.2.3/ollama-darwin.tgz"));
   assert.equal(bumped.sources["linux-amd64"].sha256, digest);
   assert.deepEqual(bumped.packs[0].exclude, ["lib/ollama/cuda_v12", "lib/ollama/cuda_v13"]);
   console.log("ok bump");

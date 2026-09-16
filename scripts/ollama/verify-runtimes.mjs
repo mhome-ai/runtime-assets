@@ -7,10 +7,17 @@ import { fail, loadLock, repoRoot, sha256File } from "./pack-runtimes.mjs";
 const VERSION_RE = /^[0-9]+\.[0-9]+\.[0-9]+$/;
 const SHA256_RE = /^[0-9a-f]{64}$/;
 const SOURCE_URL_RE =
-  /^https:\/\/github\.com\/ollama\/ollama\/releases\/download\/v[0-9.]+\/ollama-linux-(amd64|arm64)\.tar\.zst$/;
-const SOURCE_FILE_RE = /^ollama-linux-(amd64|arm64)\.tar\.zst$/;
-const PACK_ID_RE = /^linux-(amd64|arm64)-(cpu|cuda)$/;
+  /^https:\/\/github\.com\/ollama\/ollama\/releases\/download\/v[0-9.]+\/(ollama-linux-(amd64|arm64)\.tar\.zst|ollama-darwin\.tgz)$/;
+const SOURCE_FILE_RE = /^(ollama-linux-(amd64|arm64)\.tar\.zst|ollama-darwin\.tgz)$/;
+const PACK_ID_RE = /^(linux-(amd64|arm64)-(cpu|cuda)|darwin)$/;
 const LICENSE_URL_RE = /^https:\/\/raw\.githubusercontent\.com\/ollama\/ollama\/v/;
+
+function expectedPackFileName(packId) {
+  if (packId === "darwin") {
+    return "ollama-darwin.tgz";
+  }
+  return `ollama-${packId}.tar.zst`;
+}
 
 function isNonEmptyString(value) {
   return typeof value === "string" && value.length > 0;
@@ -61,12 +68,14 @@ export async function verifyRuntimes(root = repoRoot) {
 
   for (const pack of lock.packs) {
     assert(PACK_ID_RE.test(pack.id), `pack id ${pack.id}`);
-    assert(pack.fileName === `ollama-${pack.id}.tar.zst`, `pack fileName ${pack.id}`);
+    assert(pack.fileName === expectedPackFileName(pack.id), `pack fileName ${pack.id}`);
     assert(pack.source in lock.sources, `unknown source ${pack.source} for ${pack.id}`);
     assert(pack.transform === "identity" || pack.transform === "exclude", `transform ${pack.id}`);
     assert(Array.isArray(pack.require) && pack.require.length > 0, `require ${pack.id}`);
     assert(
-      pack.require.every((item) => item === "bin/ollama" || item.startsWith("lib/ollama/")),
+      pack.require.every(
+        (item) => item === "ollama" || item === "bin/ollama" || item.startsWith("lib/ollama/"),
+      ),
       `require paths ${pack.id}`,
     );
     assert(

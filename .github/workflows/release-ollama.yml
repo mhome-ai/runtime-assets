@@ -30,7 +30,7 @@ jobs:
           echo "public_tag=$(jq -r '.publicTag' ollama/runtimes.lock.json)" >> "$GITHUB_OUTPUT"
           echo "display_name=$(jq -r '.displayName' ollama/runtimes.lock.json)" >> "$GITHUB_OUTPUT"
           echo "engine_version=$(jq -r '.engineVersion' ollama/runtimes.lock.json)" >> "$GITHUB_OUTPUT"
-      - name: Pack Linux CPU and CUDA runtimes
+      - name: Pack Linux CPU/CUDA and macOS runtimes
         shell: bash
         run: npm run ollama:pack -- dist
       - name: Preserve packed runtimes for recovery
@@ -62,9 +62,9 @@ jobs:
           target_commitish: main
           name: ${{ steps.metadata.outputs.display_name }}
           body: |
-            Linux Ollama runtimes derived from official v${{ steps.metadata.outputs.engine_version }}.
+            Ollama runtimes derived from official v${{ steps.metadata.outputs.engine_version }}.
 
-            CPU packs drop `lib/ollama/cuda_v12` and `cuda_v13`. CUDA packs are the official archives, renamed, and still contain both CUDA 12 and 13 so Ollama can pick at runtime. ROCm and MLX extras are not included. ARM CUDA is the SBSA/server build, not Jetson.
+            Linux CPU packs drop `lib/ollama/cuda_v12` and `cuda_v13`. Linux CUDA packs are the official archives, renamed, and still contain both CUDA 12 and 13 so Ollama can pick at runtime. The macOS pack is the official `ollama-darwin.tgz`, mirrored unchanged. ROCm extras are not included. ARM CUDA is the SBSA/server build, not Jetson.
 
             MIT license text and SHA-256 checksums accompany the archives. CUDA packs also contain NVIDIA CUDA libraries redistributed unchanged from upstream; see NVIDIA CUDA Toolkit EULA.
           files: dist/*
