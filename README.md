@@ -57,3 +57,18 @@ Commit the lock, merge to `main`, then run workflow `Release Ollama Linux
 runtimes`. That job reads the lock, fills `ollama/upstream/` as needed, packs
 CPU/CUDA/darwin, and uploads GitHub Release `ollama-v<engineVersion>`. After it
 finishes, copy `SHA256SUMS` into the desktop runtime catalog.
+
+## Camera ReID OSNet
+
+Camera person-reidentification ONNX weights. Version is three-part
+(`1.0.0` → Release `camera-reid-osnet-v1.0.0`). The Camera node pins that tag
+in its bundled manifest; it does not chase latest.
+
+```bash
+scripts/verify-camera-reid.sh
+scripts/publish-camera-reid.sh false   # pack only
+```
+
+Commit `camera-reid.lock.json`, merge to `main`, then run workflow
+`Release Camera ReID OSNet`. Tags are never overwritten.
+

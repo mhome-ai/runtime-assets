@@ -17,6 +17,13 @@ jobs:
       - run: bash -n scripts/prepare-model-pack.sh scripts/verify-model-packs.sh
       - run: python -m py_compile scripts/smoke-kokoro-onnx.py
 
+  camera-reid:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: scripts/verify-camera-reid.sh
+      - run: bash -n scripts/prepare-camera-reid.sh scripts/verify-camera-reid.sh scripts/publish-camera-reid.sh
+
   ollama-runtimes:
     runs-on: ubuntu-24.04
     steps:
